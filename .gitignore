@@ -1,0 +1,14 @@
+# Exclude CMake build directories
+/build/
+/build*/
+/out/
+
+# Exclude vcpkg installed dependencies and local artifacts
+/vcpkg_installed/
+/vcpkg/
+
+# Exclude IDE-specific configuration folders (Optional but recommended)
+/.vs/
+/.vscode/
+/CMakeSettings.json
+/CMakeUserPresets.json
