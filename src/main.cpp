@@ -1,4 +1,5 @@
 #include "http_connection.hpp"
+#include "router.hpp"
 #include <spdlog/spdlog.h>
 #include <boost/asio.hpp>
 #include <thread>
@@ -7,27 +8,32 @@
 namespace net = boost::asio;
 using tcp = net::ip::tcp;
 
-void accept_loop(tcp::acceptor& acceptor) {
-    // async_accept: wait for a client, hand us a ready-to-use socket for
-    // that specific client, then immediately go wait for the NEXT client
-    // (that's the recursive call to accept_loop at the bottom).
+std::shared_ptr<Router> build_router() {
+    auto router = std::make_shared<Router>();
+
+    // Hardcoded for now -- this becomes YAML-driven in Phase 5.
+    router->add_route({http::verb::get, "/users", MatchType::Prefix, "user-service"});
+    router->add_route({http::verb::get, "/orders", MatchType::Prefix, "order-service"});
+    router->add_route({http::verb::get, "/health", MatchType::Exact, "gateway-self"});
+
+    return router;
+}
+
+void accept_loop(tcp::acceptor& acceptor, std::shared_ptr<Router> router) {
     acceptor.async_accept(
-        [&acceptor](beast::error_code ec, tcp::socket socket) {
+        [&acceptor, router](beast::error_code ec, tcp::socket socket) {
             if (!ec) {
-                // Each accepted connection gets its own HttpConnection,
-                // owned by a shared_ptr, and we kick off its read/write chain.
-                std::make_shared<HttpConnection>(std::move(socket))->start();
+                std::make_shared<HttpConnection>(std::move(socket), router)->start();
             } else {
                 spdlog::warn("accept error: {}", ec.message());
             }
 
-            // Keep accepting new connections indefinitely.
-            accept_loop(acceptor);
+            accept_loop(acceptor, router);
         });
 }
 
 int main() {
-    spdlog::info("api-gateway starting up (Phase 2: HTTP server)");
+    spdlog::info("api-gateway starting up (Phase 3: request routing)");
 
     const unsigned short port = 8080;
     net::io_context ioc;
@@ -35,11 +41,9 @@ int main() {
     tcp::acceptor acceptor(ioc, tcp::endpoint(tcp::v4(), port));
     spdlog::info("listening on port {}", port);
 
-    accept_loop(acceptor);
+    auto router = build_router();
+    accept_loop(acceptor, router);
 
-    // Run the event loop on a small pool of threads instead of just one.
-    // This is what lets Asio actually use multiple CPU cores: any thread
-    // in this pool can pick up any ready callback.
     const unsigned int thread_count = std::max(2u, std::thread::hardware_concurrency());
     std::vector<std::thread> threads;
     threads.reserve(thread_count - 1);
@@ -48,7 +52,7 @@ int main() {
         threads.emplace_back([&ioc] { ioc.run(); });
     }
 
-    ioc.run(); // main thread also participates in running the event loop
+    ioc.run();
 
     for (auto& t : threads) {
         t.join();

@@ -13,6 +13,7 @@ find_package(Boost REQUIRED COMPONENTS asio beast)
 add_executable(api_gateway
     src/main.cpp
     src/http_connection.cpp
+    src/router.cpp
 )
 
 target_link_libraries(api_gateway

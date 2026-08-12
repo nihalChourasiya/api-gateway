@@ -3,6 +3,7 @@
 #include <boost/asio.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
+#include "router.hpp"
 #include <memory>
 
 namespace net = boost::asio;
@@ -18,7 +19,7 @@ using tcp = net::ip::tcp;
 // to itself inside async callbacks
 class HttpConnection : public std::enable_shared_from_this<HttpConnection> {
 public:
-    explicit HttpConnection(tcp::socket socket);
+    explicit HttpConnection(tcp::socket socket, std::shared_ptr<Router> router);
 
     // Kicks off the read -> handle -> write chain. Called once, right after
     // the connection is accepted.
@@ -32,6 +33,7 @@ private:
     void on_write(beast::error_code ec, std::size_t bytes_transferred);
 
     tcp::socket socket_;
+    std::shared_ptr<Router> router_;
 
     // Beast needs a buffer to accumulate bytes into while it incrementally
     // parses the HTTP request off the wire. 8KB is a generous starting size
