@@ -3,43 +3,42 @@
 #include <boost/asio.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
-#include "router.hpp"
 #include <memory>
+#include <optional>
+#include "router.hpp"
+#include "service_registry.hpp"
 
 namespace net = boost::asio;
 namespace beast = boost::beast;
 namespace http = beast::http;
 using tcp = net::ip::tcp;
 
-// Handles the full lifecycle of ONE client connection: read the request,
-// build a response, write it back, then close (or read the next request,
-// for keep-alive — we'll add that once the basics work).
-//
-// Inherits from enable_shared_from_this so it can safely hand out shared_ptrs
-// to itself inside async callbacks
 class HttpConnection : public std::enable_shared_from_this<HttpConnection> {
 public:
-    explicit HttpConnection(tcp::socket socket, std::shared_ptr<Router> router);
+    HttpConnection(tcp::socket socket,
+                   std::shared_ptr<Router> router,
+                   std::shared_ptr<ServiceRegistry> registry,
+                   net::io_context& ioc);
 
-    // Kicks off the read -> handle -> write chain. Called once, right after
-    // the connection is accepted.
     void start();
 
 private:
     void read_request();
     void on_read(beast::error_code ec, std::size_t bytes_transferred);
-    void build_response();
+    void handle_request();
+    void forward_request();
+    void send_error(http::status status, const std::string& message);
+    void on_backend_response(beast::error_code ec, http::response<http::string_body> backend_response);
     void write_response();
     void on_write(beast::error_code ec, std::size_t bytes_transferred);
 
     tcp::socket socket_;
     std::shared_ptr<Router> router_;
+    std::shared_ptr<ServiceRegistry> registry_;
+    net::io_context& ioc_;
 
-    // Beast needs a buffer to accumulate bytes into while it incrementally
-    // parses the HTTP request off the wire. 8KB is a generous starting size
-    // for a request with no large body.
     beast::flat_buffer buffer_{8192};
-
     http::request<http::string_body> request_;
     http::response<http::string_body> response_;
+    std::optional<Route> matched_route_;
 };

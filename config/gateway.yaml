@@ -1,0 +1,25 @@
+services:
+  user-service:
+    load_balancing: round_robin
+    instances:
+      - host: 127.0.0.1
+        port: 9001
+      - host: 127.0.0.1
+        port: 9002
+      - host: 127.0.0.1
+        port: 9003
+
+  order-service:
+    load_balancing: least_connections
+    instances:
+      - host: 127.0.0.1
+        port: 9005
+
+routes:
+  - path_prefix: /users
+    method: GET
+    service: user-service
+
+  - path_prefix: /orders
+    method: GET
+    service: order-service

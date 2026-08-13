@@ -9,11 +9,17 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(Threads REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(Boost REQUIRED COMPONENTS asio beast)
+find_package(yaml-cpp CONFIG REQUIRED)
 
 add_executable(api_gateway
     src/main.cpp
     src/http_connection.cpp
     src/router.cpp
+    src/http_client.cpp
+    src/configuration.cpp
+    src/service_registry.cpp
+    src/round_robin_balancer.cpp
+    src/least_connections_balancer.cpp
 )
 
 target_link_libraries(api_gateway
@@ -22,4 +28,5 @@ target_link_libraries(api_gateway
         spdlog::spdlog
         Boost::asio
         Boost::beast
+        yaml-cpp::yaml-cpp
 )
