@@ -1,3 +1,9 @@
+health_check:
+  interval_ms: 5000
+  timeout_ms: 1000
+  unhealthy_after: 3
+  healthy_after: 1
+
 services:
   user-service:
     load_balancing: round_robin

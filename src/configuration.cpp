@@ -88,6 +88,16 @@ Configuration Configuration::load(const std::string& path) {
         ++route_count;
     }
 
+    HealthCheckConfig health_check; // defaults already set in the struct
+
+    if (root["health_check"]) {
+        auto hc = root["health_check"];
+        if (hc["interval_ms"])      health_check.interval = std::chrono::milliseconds(hc["interval_ms"].as<int>());
+        if (hc["timeout_ms"])       health_check.timeout = std::chrono::milliseconds(hc["timeout_ms"].as<int>());
+        if (hc["unhealthy_after"])  health_check.unhealthy_after = hc["unhealthy_after"].as<int>();
+        if (hc["healthy_after"])    health_check.healthy_after = hc["healthy_after"].as<int>();
+    }
+
     spdlog::info("configuration loaded: {} services, {} routes", service_count, route_count);
-    return Configuration{router, registry};
+    return Configuration{router, registry, health_check};
 }

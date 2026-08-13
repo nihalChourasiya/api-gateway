@@ -1,5 +1,6 @@
 #include "http_connection.hpp"
 #include "configuration.hpp"
+#include "health_checker.hpp"
 #include <spdlog/spdlog.h>
 #include <boost/asio.hpp>
 #include <thread>
@@ -42,6 +43,9 @@ int main() {
     spdlog::info("listening on port {}", port);
 
     accept_loop(acceptor, ioc, config.router, config.registry);
+
+    auto health_checker = std::make_shared<HealthChecker>(ioc, config.registry, config.health_check);
+    health_checker->start();
 
     const unsigned int thread_count = std::max(2u, std::thread::hardware_concurrency());
     std::vector<std::thread> threads;

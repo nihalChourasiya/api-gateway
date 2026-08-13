@@ -20,6 +20,7 @@ add_executable(api_gateway
     src/service_registry.cpp
     src/round_robin_balancer.cpp
     src/least_connections_balancer.cpp
+    src/health_checker.cpp
 )
 
 target_link_libraries(api_gateway
