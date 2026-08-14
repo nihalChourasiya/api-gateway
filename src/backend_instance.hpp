@@ -6,6 +6,8 @@
 struct BackendInstance {
     std::string host;
     unsigned short port;
+    std::string host_header;
+    int id = -1; // Unique ID for zero-allocation connection pooling
     std::atomic<int> active_connections{0};
 
     // Written ONLY by HealthChecker (effectively single-threaded, since it
@@ -21,12 +23,14 @@ struct BackendInstance {
     int consecutive_failures = 0;
     int consecutive_successes = 0;
 
-    BackendInstance(std::string h, unsigned short p)
-        : host(std::move(h)), port(p) {}
+    BackendInstance(std::string h, unsigned short p, int instance_id = -1)
+        : host(std::move(h)), port(p), host_header(host + ":" + std::to_string(port)), id(instance_id) {}
 
     BackendInstance(BackendInstance&& other) noexcept
         : host(std::move(other.host)),
           port(other.port),
+          host_header(std::move(other.host_header)),
+          id(other.id),
           active_connections(other.active_connections.load()),
           is_healthy(other.is_healthy.load()),
           consecutive_failures(other.consecutive_failures),

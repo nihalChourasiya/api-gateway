@@ -6,13 +6,28 @@
 HttpConnection::HttpConnection(tcp::socket socket,
                                 std::shared_ptr<Router> router,
                                 std::shared_ptr<ServiceRegistry> registry,
+                                std::shared_ptr<ConnectionPool> pool,
                                 net::io_context& ioc)
     : socket_(std::move(socket)),
       router_(std::move(router)),
       registry_(std::move(registry)),
-      ioc_(ioc) {}
+      pool_(std::move(pool)),
+      ioc_(ioc),
+      client_(std::make_shared<HttpClient>(ioc)) {
+    
+    beast::error_code ec;
+    socket_.set_option(tcp::no_delay(true), ec);
+    if (ec) {
+        spdlog::warn("failed to set TCP_NODELAY on client socket: {}", ec.message());
+    }
+}
 
 void HttpConnection::start() {
+    beast::error_code ep_ec;
+    auto remote = socket_.remote_endpoint(ep_ec);
+    if (!ep_ec) {
+        client_ip_ = remote.address().to_string();
+    }
     read_request();
 }
 
@@ -38,21 +53,14 @@ void HttpConnection::on_read(beast::error_code ec, std::size_t) {
 void HttpConnection::handle_request() {
     matched_route_ = router_->match(request_.method(), request_.target());
 
-    if (!matched_route_.has_value()) {
+    if (matched_route_ == nullptr) {
         spdlog::info("{} {} -> 404", std::string(request_.method_string()), std::string(request_.target()));
         send_error(http::status::not_found, "404 Not Found: no route matches this request\n");
         return;
     }
 
-    spdlog::info("{} {} -> {} (forwarding)",
-                 std::string(request_.method_string()),
-                 std::string(request_.target()),
-                 matched_route_->service_name);
     forward_request();
 }
-
-#include "connection_guard.hpp"
-// (add this #include near the top, alongside the others)
 
 void HttpConnection::forward_request() {
     Service* service = registry_->find(matched_route_->service_name);
@@ -72,10 +80,7 @@ void HttpConnection::forward_request() {
         return;
     }
 
-    spdlog::info("selected backend {}:{} for {} (active_connections now {})",
-                 instance->host, instance->port, matched_route_->service_name,
-                 instance->active_connections.load() + 1);
-
+    // Strip hop-by-hop headers before forwarding
     request_.erase(http::field::connection);
     request_.erase(http::field::keep_alive);
     request_.erase(http::field::proxy_authenticate);
@@ -85,39 +90,47 @@ void HttpConnection::forward_request() {
     request_.erase(http::field::transfer_encoding);
     request_.erase(http::field::upgrade);
 
-    request_.set(http::field::host, instance->host + ":" + std::to_string(instance->port));
+    request_.set(http::field::host, instance->host_header);
 
-    beast::error_code ep_ec;
-    auto remote = socket_.remote_endpoint(ep_ec);
-    if (!ep_ec) {
-        request_.set("X-Forwarded-For", remote.address().to_string());
+    if (!client_ip_.empty()) {
+        request_.set("X-Forwarded-For", client_ip_);
     }
 
-    request_.keep_alive(false);
+    // Ask the backend to keep the connection alive so we can pool it.
+    request_.keep_alive(true);
 
-    // The guard is heap-allocated and captured BY the completion lambda,
-    // not held as a local stack variable -- this is the important part.
-    // forward_request() returns almost immediately (async_forward just
-    // schedules work and comes back), so a stack-local guard would be
-    // destroyed (decrementing the counter) way too early, before the
-    // backend has even responded. Capturing a shared_ptr to the guard in
-    // the lambda keeps it alive for exactly as long as this request is
-    // actually in flight, and it's destroyed automatically the instant
-    // the lambda finishes running -- covering every exit path uniformly.
-    auto guard = std::make_shared<ConnectionGuard>(*instance);
+    // The guard is managed as a member of HttpConnection. It lives exactly
+    // as long as the backend request is in flight, and is reset in on_backend_response.
+    guard_.emplace(*instance);
 
-    auto client = std::make_shared<HttpClient>(ioc_);
+    // Capture backend instance ID so we can return the socket to the pool later.
+    backend_instance_id_ = instance->id;
+
     auto self = shared_from_this();
 
-    client->async_forward(
-        instance->host, instance->port, request_, std::chrono::milliseconds(3000),
-        [self, guard](beast::error_code ec, http::response<http::string_body> backend_response) {
-            self->on_backend_response(ec, std::move(backend_response));
-        });
+    // Try the warm path first: grab an already-connected socket from the pool.
+    auto pooled = pool_->acquire(backend_instance_id_);
+
+    if (pooled.has_value()) {
+        // Warm path -- skip DNS resolve and TCP connect entirely.
+        client_->async_forward(
+            std::move(*pooled), request_, response_, std::chrono::milliseconds(3000),
+            [self](beast::error_code ec) {
+                self->on_backend_response(ec);
+            });
+    } else {
+        // Cold path -- open a brand new connection.
+        client_->async_forward(
+            instance->host, instance->port, request_, response_, std::chrono::milliseconds(3000),
+            [self](beast::error_code ec) {
+                self->on_backend_response(ec);
+            });
+    }
 }
 
 void HttpConnection::send_error(http::status status, const std::string& message) {
-    response_.version(request_.version());
+    response_ = {};
+    response_.version(request_.version() == 0 ? 11 : request_.version());
     response_.result(status);
     response_.set(http::field::server, "api-gateway");
     response_.set(http::field::content_type, "text/plain");
@@ -126,8 +139,7 @@ void HttpConnection::send_error(http::status status, const std::string& message)
     write_response();
 }
 
-void HttpConnection::on_backend_response(beast::error_code ec,
-                                          http::response<http::string_body> backend_response) {
+void HttpConnection::on_backend_response(beast::error_code ec) {
     if (ec) {
         if (ec == net::error::timed_out) {
             spdlog::warn("backend timeout: {}", ec.message());
@@ -136,11 +148,22 @@ void HttpConnection::on_backend_response(beast::error_code ec,
             spdlog::warn("backend connection error: {}", ec.message());
             send_error(http::status::bad_gateway, "502 Bad Gateway: could not reach backend (" + ec.message() + ")\n");
         }
+        // On error, do NOT return the socket to the pool -- let it close.
+        guard_.reset();
         return;
     }
 
-    response_ = std::move(backend_response);
+    // Defer the pool release until on_write -- the response hasn't been
+    // fully sent to the client yet (write_response is async), so we can't
+    // move the backend stream into the pool here.
+    pending_release_ = response_.keep_alive();
+    guard_.reset();
+
     response_.set(http::field::server, "api-gateway");
+
+    // Mirror the client's keep-alive preference in the response we send back.
+    response_.keep_alive(request_.keep_alive());
+
     write_response();
 }
 
@@ -155,6 +178,28 @@ void HttpConnection::write_response() {
 
 void HttpConnection::on_write(beast::error_code ec, std::size_t) {
     if (ec) { spdlog::warn("write error: {}", ec.message()); return; }
-    beast::error_code ignored;
-    socket_.shutdown(tcp::socket::shutdown_send, ignored);
+
+    // Now that the response is fully written to the client, it's safe to
+    // return the backend socket to the pool.
+    if (pending_release_) {
+        pool_->release(backend_instance_id_, client_->release_stream());
+        pending_release_ = false;
+    }
+
+    guard_.reset(); // Safety reset in case send_error was called
+
+    // Respect the client's keep-alive preference: if the client wants to
+    // reuse this connection (HTTP/1.1 default), loop back and read the
+    // next request instead of shutting down.
+    if (response_.keep_alive()) {
+        request_ = {};
+        response_ = {};
+        matched_route_ = nullptr;
+        buffer_.consume(buffer_.size());
+
+        read_request();
+    } else {
+        beast::error_code ignored;
+        socket_.shutdown(tcp::socket::shutdown_send, ignored);
+    }
 }

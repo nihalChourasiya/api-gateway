@@ -3,6 +3,7 @@
 #include "router.hpp"
 #include "service_registry.hpp"
 #include "health_checker.hpp"
+#include "connection_pool.hpp"
 #include <memory>
 #include <string>
 
@@ -13,6 +14,7 @@ struct Configuration {
     std::shared_ptr<Router> router;
     std::shared_ptr<ServiceRegistry> registry;
     HealthCheckConfig health_check;
+    PoolConfig pool_config;
 
     // Throws std::runtime_error with a specific message on any validation
     // failure -- callers should treat that as "do not start the server."

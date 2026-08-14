@@ -4,10 +4,12 @@
 
 HealthChecker::HealthChecker(net::io_context& ioc,
                               std::shared_ptr<ServiceRegistry> registry,
-                              HealthCheckConfig config)
+                              HealthCheckConfig config,
+                              std::shared_ptr<ConnectionPool> pool)
     : ioc_(ioc),
       registry_(std::move(registry)),
       config_(config),
+      pool_(std::move(pool)),
       timer_(ioc) {}
 
 void HealthChecker::start() {
@@ -48,21 +50,26 @@ void HealthChecker::check_once() {
     }
 }
 
-void HealthChecker::probe_instance(BackendInstance& instance) {
-    http::request<http::string_body> request{http::verb::get, config_.path, 11};
-    request.set(http::field::host, instance.host + ":" + std::to_string(instance.port));
-    request.set(http::field::user_agent, "api-gateway-health-checker");
+struct ProbeContext {
+    std::shared_ptr<HttpClient> client;
+    http::request<http::string_body> req;
+    http::response<http::string_body> res;
+};
 
-    auto client = std::make_shared<HttpClient>(ioc_);
+void HealthChecker::probe_instance(BackendInstance& instance) {
+    auto ctx = std::make_shared<ProbeContext>();
+    ctx->client = std::make_shared<HttpClient>(ioc_);
+    ctx->req.method(http::verb::get);
+    ctx->req.target(config_.path);
+    ctx->req.version(11);
+    ctx->req.set(http::field::host, instance.host + ":" + std::to_string(instance.port));
+    ctx->req.set(http::field::user_agent, "api-gateway-health-checker");
+
     auto self = shared_from_this();
 
-    client->async_forward(
-        instance.host, instance.port, request, config_.timeout,
-        [self, &instance](beast::error_code ec, http::response<http::string_body> /*response*/) {
-            // Success here means "got ANY HTTP response before the timeout" --
-            // we deliberately don't check the status code. A 404 still proves
-            // the instance is alive, reachable, and speaking HTTP correctly,
-            // which is all a liveness probe needs to establish.
+    ctx->client->async_forward(
+        instance.host, instance.port, ctx->req, ctx->res, config_.timeout,
+        [self, &instance, ctx](beast::error_code ec) {
             bool success = !ec;
             self->handle_probe_result(instance, success);
         });
@@ -85,6 +92,10 @@ void HealthChecker::handle_probe_result(BackendInstance& instance, bool success)
             instance.is_healthy.store(false);
             spdlog::warn("backend {}:{} is now UNHEALTHY ({} consecutive failures)",
                          instance.host, instance.port, instance.consecutive_failures);
+
+            // Drain all pooled connections to this backend immediately --
+            // no point sending future requests on sockets to a dead server.
+            pool_->drain(instance.id);
         }
     }
 }

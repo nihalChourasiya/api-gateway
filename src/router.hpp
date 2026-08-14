@@ -9,8 +9,8 @@ class Router {
 public:
     void add_route(Route route);
 
-    // Returns the matching Route, or std::nullopt if nothing matches.
-    std::optional<Route> match(http::verb method, std::string_view path) const;
+    // Returns the matching Route, or nullptr if nothing matches.
+    const Route* match(http::verb method, std::string_view path) const;
 
 private:
     std::vector<Route> routes_;

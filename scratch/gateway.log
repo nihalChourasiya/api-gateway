@@ -1,0 +1,42 @@
+[2026-08-14 02:04:13.029] [info] api-gateway starting up (with backend connection pooling)
+[2026-08-14 02:04:13.031] [info] configuration loaded: 2 services, 2 routes, pool(max_idle=1000, idle_timeout=30000ms)
+[2026-08-14 02:04:13.031] [info] listening on port 8080
+[2026-08-14 02:04:13.031] [info] health checker starting: interval=5000ms, timeout=1000ms, unhealthy_after=3, healthy_after=1
+[2026-08-14 02:04:13.031] [info] using 4 threads
+[2026-08-14 02:04:25.061] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.061] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.061] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.061] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.061] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.061] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.061] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.061] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.061] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.061] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.061] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.061] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.061] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.061] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.061] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.061] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.062] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.062] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.062] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.062] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.062] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.062] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.062] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.062] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.062] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.062] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.062] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.062] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.062] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.062] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.062] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.062] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.062] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.062] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.062] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.062] [warning] read error: Connection reset by peer
+[2026-08-14 02:04:25.062] [warning] read error: Connection reset by peer

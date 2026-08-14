@@ -21,6 +21,7 @@ add_executable(api_gateway
     src/round_robin_balancer.cpp
     src/least_connections_balancer.cpp
     src/health_checker.cpp
+    src/connection_pool.cpp
 )
 
 target_link_libraries(api_gateway
@@ -31,3 +32,6 @@ target_link_libraries(api_gateway
         Boost::beast
         yaml-cpp::yaml-cpp
 )
+
+add_executable(mock_backend tools/mock_backend.cpp)
+target_link_libraries(mock_backend PRIVATE Threads::Threads Boost::asio Boost::beast)

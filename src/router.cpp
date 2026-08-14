@@ -4,13 +4,13 @@ void Router::add_route(Route route) {
     routes_.push_back(std::move(route));
 }
 
-std::optional<Route> Router::match(http::verb method, std::string_view path) const {
+const Route* Router::match(http::verb method, std::string_view path) const {
     // Pass 1: exact matches always win outright, since they're maximally specific.
     for (const auto& route : routes_) {
         if (route.method == method
             && route.match_type == MatchType::Exact
             && route.path_pattern == path) {
-            return route;
+            return &route;
         }
     }
 
@@ -36,8 +36,8 @@ std::optional<Route> Router::match(http::verb method, std::string_view path) con
     }
 
     if (best_match != nullptr) {
-        return *best_match;
+        return best_match;
     }
 
-    return std::nullopt;
+    return nullptr;
 }

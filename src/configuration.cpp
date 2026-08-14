@@ -17,6 +17,7 @@ Configuration Configuration::load(const std::string& path) {
     }
 
     int service_count = 0;
+    int global_instance_id = 0;
     for (const auto& service_entry : root["services"]) {
         Service service;
         service.name = service_entry.first.as<std::string>();
@@ -45,7 +46,7 @@ Configuration Configuration::load(const std::string& path) {
         for (const auto& inst : instances_node) {
             std::string host = inst["host"].as<std::string>();
             unsigned short port = inst["port"].as<unsigned short>();
-            service.instances.emplace_back(host, port);
+            service.instances.emplace_back(host, port, global_instance_id++);
         }
 
         registry->add_service(std::move(service));
@@ -98,6 +99,23 @@ Configuration Configuration::load(const std::string& path) {
         if (hc["healthy_after"])    health_check.healthy_after = hc["healthy_after"].as<int>();
     }
 
-    spdlog::info("configuration loaded: {} services, {} routes", service_count, route_count);
-    return Configuration{router, registry, health_check};
+    PoolConfig pool_config; // defaults already set in the struct
+
+    if (root["connection_pool"]) {
+        auto cp = root["connection_pool"];
+        if (cp["max_idle_per_backend"])  pool_config.max_idle_per_backend = cp["max_idle_per_backend"].as<int>();
+        if (cp["idle_timeout_ms"])       pool_config.idle_timeout_ms = cp["idle_timeout_ms"].as<int>();
+    }
+
+    spdlog::info("configuration loaded: {} services, {} routes, pool(max_idle={}, idle_timeout={}ms)",
+                 service_count, route_count, pool_config.max_idle_per_backend, pool_config.idle_timeout_ms);
+    
+    // Set total instances count in pool config to pre-allocate vector
+    int total_instances = 0;
+    for (const auto& pair : registry->all_services()) {
+        total_instances += pair.second.instances.size();
+    }
+    pool_config.total_instances = total_instances;
+    
+    return Configuration{router, registry, health_check, pool_config};
 }

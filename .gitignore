@@ -12,3 +12,6 @@
 /.vscode/
 /CMakeSettings.json
 /CMakeUserPresets.json
+
+# md files for documentation
+performance_journey.md

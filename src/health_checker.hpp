@@ -1,6 +1,7 @@
 #pragma once
 
 #include "service_registry.hpp"
+#include "connection_pool.hpp"
 #include <boost/asio.hpp>
 #include <boost/beast.hpp>
 #include <chrono>
@@ -21,7 +22,8 @@ class HealthChecker : public std::enable_shared_from_this<HealthChecker> {
 public:
     HealthChecker(net::io_context& ioc,
                   std::shared_ptr<ServiceRegistry> registry,
-                  HealthCheckConfig config);
+                  HealthCheckConfig config,
+                  std::shared_ptr<ConnectionPool> pool);
 
     void start();
 
@@ -35,5 +37,6 @@ private:
     net::io_context& ioc_;
     std::shared_ptr<ServiceRegistry> registry_;
     HealthCheckConfig config_;
+    std::shared_ptr<ConnectionPool> pool_;
     net::steady_timer timer_;
 };
