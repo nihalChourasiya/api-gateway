@@ -9,7 +9,7 @@
 <h1 align="center">⚡ API Gateway</h1>
 
 <p align="center">
-  <b>High-Performance C++ API Gateway — TLS-Terminating Reverse Proxy<br/>with Load Balancing, Rate Limiting, and Health-Aware Routing for Microservices</b>
+  <b>High-Performance C++ API Gateway — TLS-Terminating(Under Dev) Reverse Proxy<br/>with Load Balancing, Rate Limiting(Under Dev), and Health-Aware Routing for Microservices</b>
 </p>
 
 <p align="center">
@@ -32,7 +32,7 @@
                         └─────────────────────────────────────┘
 ```
 
-### Core Components
+### Core Components (Now on github)
 
 | Component | File | Responsibility |
 |:--|:--|:--|
