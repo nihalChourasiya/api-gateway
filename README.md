@@ -305,7 +305,7 @@ kill %2                          # Kill backend on :9002
 
 ---
 
-## 📁 Project Structure
+## 📁 Project Structure (to be restructured)
 
 ```
 api-gateway/
