@@ -6,7 +6,7 @@
   <img src="https://img.shields.io/badge/Deps-vcpkg-2196F3?style=for-the-badge&logo=microsoft&logoColor=white" />
 </p>
 
-<h1 align="center">⚡ API Gateway</h1>
+<h1 align="center">⚡ AeroProxy - API Gateway</h1>
 
 <p align="center">
   <b>High-Performance C++ API Gateway — TLS-Terminating(Under Dev) Reverse Proxy<br/>with Load Balancing, Rate Limiting(Under Dev), and Health-Aware Routing for Microservices</b>
